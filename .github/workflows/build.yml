@@ -45,11 +45,16 @@ jobs:
           npx expo prebuild --platform android --no-install --clean
           # Gradle 프로젝트 이름은 영문으로 (앱에 보이는 이름 '골목대장'은 그대로)
           sed -i "s/^rootProject.name = .*/rootProject.name = 'golmok'/" android/settings.gradle
+          # Gradle 다운로드 대기 시간 10초 → 2분 (서버가 느리면 시간 초과로 실패하던 문제)
+          sed -i "s/^networkTimeout=.*/networkTimeout=120000/" android/gradle/wrapper/gradle-wrapper.properties
+          grep -q '^networkTimeout=' android/gradle/wrapper/gradle-wrapper.properties || echo 'networkTimeout=120000' >> android/gradle/wrapper/gradle-wrapper.properties
 
       - name: Build APK
         working-directory: android
         run: |
           chmod +x gradlew
+          # Gradle 본체를 먼저 받아 둔다. 네트워크 오류면 최대 3번 다시 시도
+          for i in 1 2 3; do ./gradlew --version --no-daemon && break; echo "Gradle 다운로드 재시도 $i"; sleep 15; done
           ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
           cp app/build/outputs/apk/release/app-release.apk ../golmok.apk
 
