@@ -1,0 +1,135 @@
+# 골목대장 설치 파일 자동 빌드
+# GitHub에 코드를 올리면(또는 Actions 탭에서 "Run workflow"를 누르면) 아래 두 파일을 만들어
+# 저장소의 "Releases"에 올려 준다.
+#   - golmok.apk          : Android 폰에 바로 설치하는 파일 (링크로 친구에게 전달)
+#   - golmok-unsigned.ipa : iPhone용. Sideloadly + 내 Apple ID로 서명해서 설치
+# 비용: 공개(Public) 저장소면 무료. 비공개 저장소는 GitHub 무료 사용량(분)을 쓴다.
+
+name: Build app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install packages
+        run: npm ci
+
+      - name: Generate native Android project
+        run: |
+          npx expo prebuild --platform android --no-install --clean
+          # Gradle 프로젝트 이름은 영문으로 (앱에 보이는 이름 '골목대장'은 그대로)
+          sed -i "s/^rootProject.name = .*/rootProject.name = 'golmok'/" android/settings.gradle
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a
+          cp app/build/outputs/apk/release/app-release.apk ../golmok.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golmok-android
+          path: golmok.apk
+
+  ios:
+    name: iOS IPA (unsigned)
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Pick Xcode
+        run: |
+          # React Native 0.81 은 Xcode 16.x 에서 가장 안정적이다. 있으면 16.4, 없으면 기본값.
+          if [ -d /Applications/Xcode_16.4.app ]; then sudo xcode-select -s /Applications/Xcode_16.4.app; fi
+          xcodebuild -version
+
+      - name: Install packages
+        run: npm ci
+
+      - name: Generate native iOS project
+        run: |
+          npx expo prebuild --platform ios --no-install --clean
+          cd ios && pod install
+
+      - name: Build app (no signing)
+        run: |
+          WS=$(ls -d ios/*.xcworkspace | head -1)
+          SCHEME=$(basename "$WS" .xcworkspace)
+          echo "workspace=$WS scheme=$SCHEME"
+          set -o pipefail
+          xcodebuild -workspace "$WS" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            | tail -n 60
+
+      - name: Package IPA
+        run: |
+          APP=$(ls -d ios/build/Build/Products/Release-iphoneos/*.app | head -1)
+          echo "app=$APP"
+          mkdir -p Payload
+          cp -R "$APP" Payload/
+          zip -qry golmok-unsigned.ipa Payload
+          ls -lh golmok-unsigned.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: golmok-ios
+          path: golmok-unsigned.ipa
+
+  release:
+    name: Publish to Releases
+    needs: [android, ios]
+    if: ${{ always() && (needs.android.result == 'success' || needs.ios.result == 'success') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: out
+          merge-multiple: true
+
+      - name: List files
+        run: ls -lh out
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: build-${{ github.run_number }}
+          name: 골목대장 데모 빌드 ${{ github.run_number }}
+          make_latest: true
+          body: |
+            - **golmok.apk** — Android 폰에서 이 페이지를 열고 눌러서 설치
+            - **golmok-unsigned.ipa** — iPhone: PC의 Sideloadly로 설치 (README 참고)
+          files: out/*
