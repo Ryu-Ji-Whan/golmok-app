@@ -19,6 +19,7 @@ export default function Done() {
         areaName: signupDraft.areaName,
         marketing: signupDraft.agreements.marketing,
         joinedAt: Date.now(),
+        provider: signupDraft.provider || undefined,
       },
     });
     // 가입 화면으로 뒤로 가지 않도록 첫 화면으로 교체한다.

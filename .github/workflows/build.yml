@@ -40,6 +40,9 @@ jobs:
       - name: Install packages
         run: npm ci
 
+      - name: Typecheck (경고만, 빌드는 계속)
+        run: npx tsc --noEmit || echo "::warning title=Typecheck::TypeScript 오류가 있어요. 위 로그를 확인하세요."
+
       - name: Generate native Android project
         run: |
           npx expo prebuild --platform android --no-install --clean

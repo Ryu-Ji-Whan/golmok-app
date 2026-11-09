@@ -4,7 +4,8 @@ import { C } from './theme';
 
 /**
  * 지도 화면(WebView 안에서 도는 HTML).
- * - 지도 타일: CARTO Voyager (OpenStreetMap 데이터). API 키가 필요 없다.
+ * - 지도 타일: OpenStreetMap 공식 타일 (API 키 불필요, 데모·소량 사용만 허용).
+ *   CARTO 타일은 이제 API 키가 없으면 "API KEY REQUIRED" 그림을 보내서 바꿨다.
  * - 안개: 캔버스 한 장을 지도 위에 덮고, 밝힌 칸만 지운다.
  * - 앱(React Native) ↔ 지도 통신
  *     앱 → 지도: window.__explored(keys, fogOn) / window.__icons(map) / window.__set(state) / window.__fly(lat, lng, zoom)
@@ -56,9 +57,9 @@ export function buildMapHtml(center: { latitude: number; longitude: number }, zo
   var map = L.map('map', { zoomControl: false, minZoom: 13, maxZoom: 19, attributionControl: true, tap: false })
     .setView(CFG.center, CFG.zoom);
   map.attributionControl.setPrefix(false);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd', maxZoom: 19, detectRetina: false,
-    attribution: '&copy; OpenStreetMap &copy; CARTO'
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, detectRetina: false,
+    attribution: '&copy; OpenStreetMap contributors'
   }).addTo(map);
 
   // ---------- 안개 ----------

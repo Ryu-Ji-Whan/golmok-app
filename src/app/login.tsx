@@ -13,21 +13,29 @@ const PROVIDERS = [
 ];
 
 export default function Login() {
-  const { dispatch } = useStore();
+  const { s, dispatch } = useStore();
   const [loading, setLoading] = useState<string | null>(null);
+  // 로그아웃한 소셜 계정 (둘러보기 손님이나 로그인 방법이 기록되지 않은 예전 계정은 제외)
+  const returning = PROVIDERS.some((p) => p.id === s.savedUser?.provider) ? s.savedUser : null;
 
   const go = (provider: string) => {
     setLoading(provider);
     signupDraft.provider = provider;
-    // 데모: 실제 소셜 로그인 대신 1.2초 뒤 신규 회원으로 처리한다.
+    // 데모: 실제 소셜 로그인 대신 1.2초 뒤 처리한다.
+    // 로그아웃했던 계정과 같은 방법으로 들어오면 가입 없이 그 계정으로 돌아가고, 아니면 신규 가입.
     setTimeout(() => {
       setLoading(null);
-      router.push('/signup/terms');
+      if (returning && returning.provider === provider) {
+        dispatch({ type: 'restoreLogin' });
+        router.replace('/walk');
+      } else {
+        router.push('/signup/terms');
+      }
     }, 1200);
   };
 
   const browse = () => {
-    dispatch({ type: 'signup', user: { nickname: '손님', characterId: 'a00', areaName: '수원시 팔달구 행궁동', marketing: false, joinedAt: Date.now() }, gift: [] });
+    dispatch({ type: 'signup', user: { nickname: '손님', characterId: 'a00', areaName: '수원시 팔달구 행궁동', marketing: false, joinedAt: Date.now(), provider: 'guest' }, gift: [] });
     router.replace('/walk');
   };
 
@@ -57,6 +65,11 @@ export default function Login() {
         <Pressable onPress={browse} style={{ alignSelf: 'center', padding: 10 }}>
           <Text style={{ fontSize: 13, color: C.muted }}>로그인 없이 둘러보기</Text>
         </Pressable>
+        {returning ? (
+          <Text style={{ fontSize: 12, color: C.forest, textAlign: 'center' }}>
+            {PROVIDERS.find((p) => p.id === returning.provider)?.label.replace(' 계속하기', '')} 들어오면 {returning.nickname}님 계정으로 돌아가요
+          </Text>
+        ) : null}
         <Text style={{ fontSize: 11, color: C.muted, textAlign: 'center' }}>데모 버전: 실제 소셜 로그인 없이 회원가입 화면으로 넘어가요</Text>
       </View>
 

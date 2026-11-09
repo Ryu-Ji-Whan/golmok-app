@@ -9,6 +9,8 @@ export type User = {
   areaName: string;
   marketing: boolean;
   joinedAt: number;
+  /** 가입할 때 고른 로그인 방법: kakao / apple / google / guest(둘러보기) */
+  provider?: string;
 };
 
 export type Spot = {
@@ -40,6 +42,8 @@ export type Coupon = { id: string; storeId: string; title: string; issuedAt: num
 export type State = {
   hydrated: boolean;
   user: User | null;
+  /** 로그아웃한 계정. 같은 로그인 방법으로 다시 들어오면 가입 없이 이 계정으로 돌아온다. */
+  savedUser: User | null;
   explored: string[];
   walks: Walk[];
   activeWalk: Walk | null;
@@ -56,6 +60,7 @@ export type State = {
 const initial: State = {
   hydrated: false,
   user: null,
+  savedUser: null,
   explored: [],
   walks: [],
   activeWalk: null,
@@ -72,6 +77,8 @@ const initial: State = {
 type Action =
   | { type: 'hydrate'; state: Partial<State> }
   | { type: 'signup'; user: User; gift: string[] }
+  | { type: 'logout'; at: number }
+  | { type: 'restoreLogin' }
   | { type: 'startWalk'; id: string; at: number }
   | { type: 'move'; pos: LatLng; addDistance: number; newCells: string[]; record: boolean }
   | { type: 'endWalk'; at: number }
@@ -94,7 +101,14 @@ function reducer(s: State, a: Action): State {
     case 'hydrate':
       return { ...s, ...a.state, hydrated: true };
     case 'signup':
-      return { ...s, user: a.user, owned: uniq([...s.owned, ...a.gift]) };
+      return { ...s, user: a.user, savedUser: null, owned: uniq([...s.owned, ...a.gift]) };
+    case 'logout': {
+      // 산책 중이었다면 그 산책은 끝난 것으로 저장한다. 기록·지도·스티커는 폰에 그대로 둔다.
+      const walks = s.activeWalk ? [{ ...s.activeWalk, endedAt: a.at }, ...s.walks] : s.walks;
+      return { ...s, user: null, savedUser: s.user, activeWalk: null, walks };
+    }
+    case 'restoreLogin':
+      return s.savedUser ? { ...s, user: s.savedUser, savedUser: null } : s;
     case 'startWalk':
       return { ...s, activeWalk: { id: a.id, startedAt: a.at, distanceM: 0, newCells: 0, path: [], spotIds: [] } };
     case 'move': {

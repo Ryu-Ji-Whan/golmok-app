@@ -27,6 +27,24 @@ export default function Settings() {
       },
     ]);
 
+  const guest = u?.provider === 'guest';
+  const logout = () =>
+    Alert.alert(
+      guest ? '로그인 화면으로 갈까요?' : '로그아웃할까요?',
+      guest ? '둘러보기를 끝내고 로그인 화면으로 가요. 기록은 이 폰에 남아요.' : '기록은 이 폰에 남아 있고, 같은 방법으로 다시 로그인하면 그대로 이어져요.',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: guest ? '로그인하러 가기' : '로그아웃',
+          onPress: () => {
+            dispatch({ type: 'logout', at: Date.now() });
+            router.dismissAll();
+            router.replace('/login');
+          },
+        },
+      ],
+    );
+
   const row = (icon: React.ComponentProps<typeof Icon>['name'], label: string, value?: string, onPress?: () => void) => (
     <Pressable onPress={onPress} disabled={!onPress} style={{ height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderColor: C.lineSoft }}>
       <Icon name={icon} size={20} color={C.leaf} />
@@ -69,7 +87,8 @@ export default function Settings() {
           로그인·결제·리더보드 이웃·피드 글은 예시예요. 산책 경로, 안개 걷기, 스티커 기록, 사진은 실제로 동작하고 이 폰 안에만 저장돼요.
         </Text>
       </View>
-      <Button title="데모 데이터 초기화" variant="outline" icon="trash" onPress={reset} style={{ marginTop: 14 }} />
+      <Button title={guest ? '로그인하러 가기' : '로그아웃'} variant="outline" icon="lock" onPress={logout} style={{ marginTop: 14 }} />
+      <Button title="데모 데이터 초기화" variant="outline" icon="trash" onPress={reset} style={{ marginTop: 8 }} />
       <Text style={{ marginTop: 10, textAlign: 'center', fontSize: 11, color: C.muted }}>골목대장 데모 v0.1.0</Text>
     </Screen>
   );
